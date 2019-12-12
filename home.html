@@ -1,0 +1,206 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+	<meta charset="utf-8" />
+    <script src="JS/angular-1.6.4.js"></script>
+    <script src="JS/angular-drag-and-drop-lists.js"></script>
+    <link rel="stylesheet" type="text/css" href="CSS/dnd.css" >
+    <link rel="stylesheet" type="text/css" href="CSS/bootstrap.css">
+
+    <script>
+        var app = angular.module('myApp', ['dndLists'], function ($httpProvider) {
+            //fix the error of baddata when calling webservice with parameters
+            $httpProvider.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded;charset=utf-8';
+
+            var param = function (obj) {
+                var query = '', name, value, fullSubName, subName, subValue, innerObj, i;
+
+                for (name in obj) {
+                    value = obj[name];
+
+                    if (value instanceof Array) {
+                        for (i = 0; i < value.length; ++i) {
+                            subValue = value[i];
+                            fullSubName = name + '[' + i + ']';
+                            innerObj = {};
+                            innerObj[fullSubName] = subValue;
+                            query += param(innerObj) + '&';
+                        }
+                    }
+                    else if (value instanceof Object) {
+                        for (subName in value) {
+                            subValue = value[subName];
+                            fullSubName = name + '[' + subName + ']';
+                            innerObj = {};
+                            innerObj[fullSubName] = subValue;
+                            query += param(innerObj) + '&';
+                        }
+                    }
+                    else if (value !== undefined && value !== null)
+                        query += encodeURIComponent(name) + '=' + encodeURIComponent(value) + '&';
+                }
+
+                return query.length ? query.substr(0, query.length - 1) : query;
+            };
+
+            $httpProvider.defaults.transformRequest = [function (data) {
+                return angular.isObject(data) && String(data) !== '[object File]' ? param(data) : data;
+            }];
+        });
+
+        app.controller("myCtrl", function ($scope, $http, $timeout, $window) {
+            $scope.models = {
+                lists: {"Todo": [], "Process": [], "Finish": []}
+            };
+
+            var firstTime = 0;
+
+            $http.post('WebService.asmx/GetTaskList', {
+            }).then(function (response) {
+                for (var i = 0; i < response.data.length; i++) {
+                    if (response.data[i].STATUS == "Todo") {
+                        $scope.models.lists.Todo.push({ label: response.data[i].TASK });
+                    } else if (response.data[i].STATUS == "Process") {
+                        $scope.models.lists.Process.push({ label: response.data[i].TASK });
+                    } else if (response.data[i].STATUS == "Finish") {
+                        $scope.models.lists.Finish.push({ label: response.data[i].TASK });
+                    }
+                }
+            });
+
+            $timeout(function () {
+                $window.location.reload();
+            }, 20000);
+
+            // Model to JSON for demo purpose
+            $scope.$watch('models', function (model) {
+                $scope.modelAsJson = angular.toJson(model, true);
+            }, true);
+
+            $scope.$watch('models.lists.Todo', function (newValue, oldValue) {
+                firstTime++
+                if (firstTime > 6 && newValue.length > oldValue.length) {
+                    var label = "";
+                    var result = false;
+
+                    for (var i = 0; i < oldValue.length; i++){
+                        if (newValue[i].label != oldValue[i].label) {
+                            if (result == false) {
+                                label = newValue[i].label;
+
+                                result = true;
+                            }
+                        }
+                    }
+
+                    if (result == false) {
+                        label = newValue[newValue.length - 1].label;
+                    }
+
+                    $http.post('WebService.asmx/UpdateTaskList', {
+                        label: label,
+                        status: "Todo"
+                    });
+                }
+            }, true);
+
+            $scope.$watch('models.lists.Process', function (newValue, oldValue) {
+                firstTime++
+                if (firstTime > 6 && newValue.length > oldValue.length) {
+                    var label = "";
+                    var result = false;
+
+                    for (var i = 0; i < oldValue.length; i++) {
+                        if (newValue[i].label != oldValue[i].label) {
+                            if (result == false) {
+                                label = newValue[i].label;
+
+                                result = true;
+                            }
+                        }
+                    }
+
+                    if (result == false) {
+                        label = newValue[newValue.length - 1].label;
+                    }
+
+                    $http.post('WebService.asmx/UpdateTaskList', {
+                        label: label,
+                        status: "Process"
+                    });
+                }
+            }, true);
+
+            $scope.$watch('models.lists.Finish', function (newValue, oldValue) {
+                firstTime++
+                if (firstTime > 6 && newValue.length > oldValue.length) {
+                    var label = "";
+                    var result = false;
+
+                    for (var i = 0; i < oldValue.length; i++) {
+                        if (newValue[i].label != oldValue[i].label) {
+                            if (result == false) {
+                                label = newValue[i].label;
+
+                                result = true;
+                            }
+                        }
+                    }
+
+                    if (result == false) {
+                        label = newValue[newValue.length - 1].label;
+                    }
+
+                    $http.post('WebService.asmx/UpdateTaskList', {
+                        label: label,
+                        status: "Finish"
+                    });
+                }
+            }, true);
+        });
+    </script>
+</head>
+<body>
+    <div ng-app="myApp">
+        <div ng-controller="myCtrl">
+            <div class="container">
+                <h1>Demo: Simple Lists</h1>
+                <div class="simpleDemo row ng-scope">
+                    <div class="col-md-12">
+                        <div class="row">
+                            <div ng-repeat="(listName, list) in models.lists" class="col-md-4">
+                                <div class="panel panel-info">
+                                    <div class="panel-heading">
+                                        <h3 class="panel-title">{{listName}}</h3>
+                                    </div>
+                                    <div class="panel-body ng-scope">
+                                        <ul dnd-list="list">
+                                            <li ng-repeat="item in list"
+                                                dnd-draggable="item"
+                                                dnd-moved="list.splice($index, 1)"
+                                                dnd-effect-allowed="move">
+                                                {{item.label}}
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--<div class="col-md-4">
+                        <div class="panel panel-default">
+                            <div class="panel-heading">
+                                <h3 class="panel-title">Generated Model</h3>
+                            </div>
+                            <div class="panel-body">
+                                <pre class="code">{{modelAsJson}}</pre>
+                            </div>
+                        </div>
+                    </div>-->
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
